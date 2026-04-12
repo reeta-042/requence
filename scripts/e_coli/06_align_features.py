@@ -4,14 +4,14 @@
 # Input:  gene_presence_production.csv
 #         kmer_production.csv
 #         snp_production.csv
-#         $TEMPLATES_DIR/features_amoxillin.txt
-#         $TEMPLATES_DIR/features_coxime.txt
-#         $TEMPLATES_DIR/features_doxy.txt
-#         $TEMPLATES_DIR/features_levo.txt
-#         $TEMPLATES_DIR/features_nali.txt
-#         $TEMPLATES_DIR/features_norflo.txt
-#         $TEMPLATES_DIR/features_strep.txt
-#         $TEMPLATES_DIR/features_tetra.txt
+#         $TEMPLATES_DIR/features_amoxillin_ecoli.txt
+#         $TEMPLATES_DIR/features_coxime_ecoli.txt
+#         $TEMPLATES_DIR/features_doxy_ecoli.txt
+#         $TEMPLATES_DIR/features_levo_ecoli.txt
+#         $TEMPLATES_DIR/features_nali_ecoli.txt
+#         $TEMPLATES_DIR/features_norflo_ecoli.txt
+#         $TEMPLATES_DIR/features_strep_ecoli.txt
+#         $TEMPLATES_DIR/features_tetra_ecoli.txt
 # Output: aligned_amoxicillin.csv
 #         aligned_coxime.csv
 #         aligned_doxy.csv
@@ -58,42 +58,42 @@ with open(LOG_FILE, "w") as fh:
 ANTIBIOTIC_CONFIG = {
     "amoxicillin": {
         "full_name": "Amoxicillin/Clavulanic Acid",
-        "template":  "features_amoxillin.txt",   # original filename spelling preserved
+        "template":  "features_amoxillin_ecoli.txt",
         "output":    "aligned_amoxicillin.csv",
     },
     "coxime": {
         "full_name": "Cefuroxime",
-        "template":  "features_coxime.txt",
+        "template":  "features_coxime_ecoli.txt",
         "output":    "aligned_coxime.csv",
     },
     "doxy": {
         "full_name": "Doxycycline",
-        "template":  "features_doxy.txt",
+        "template":  "features_doxy_ecoli.txt",
         "output":    "aligned_doxy.csv",
     },
     "levo": {
         "full_name": "Levofloxacin",
-        "template":  "features_levo.txt",
+        "template":  "features_levo_ecoli.txt",
         "output":    "aligned_levo.csv",
     },
     "nali": {
         "full_name": "Nalidixic Acid",
-        "template":  "features_nali.txt",
+        "template":  "features_nali_ecoli.txt",
         "output":    "aligned_nali.csv",
     },
     "norflo": {
         "full_name": "Norfloxacin",
-        "template":  "features_norflo.txt",
+        "template":  "features_norflo_ecoli.txt",
         "output":    "aligned_norflo.csv",
     },
     "strep": {
         "full_name": "Streptomycin",
-        "template":  "features_strep.txt",
+        "template":  "features_strep_ecoli.txt",
         "output":    "aligned_strep.csv",
     },
     "tetra": {
         "full_name": "Tetracycline",
-        "template":  "features_tetra.txt",
+        "template":  "features_tetra_ecoli.txt",
         "output":    "aligned_tetra.csv",
     },
 }

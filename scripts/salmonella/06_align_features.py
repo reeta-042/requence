@@ -4,7 +4,7 @@
 # Input:  gene_presence_production.csv
 #         kmer_production.csv
 #         snp_production.csv
-#         $TEMPLATES_DIR/features_full_dataset.txt  (single shared template)
+#         $TEMPLATES_DIR/features_salmonella.txt  (single shared template)
 # Output: aligned_full.csv  — the ONE file all 8 Salmonella models use
 #         logs/06_align_features.log
 # NOTE:   Salmonella uses a SINGLE shared feature template.
@@ -139,8 +139,8 @@ log("ALIGNING TO FEATURE TEMPLATE")
 log("=" * 60)
 
 # Primary shared template
-template_file = TEMPLATES_DIR / "features_full_dataset.txt"
-pct_full = align_to_template(template_file, "aligned_full.csv", "Full Dataset (Genes + K-mers + SNPs)")
+template_file = TEMPLATES_DIR / "features_salmonella.txt"
+pct_full = align_to_template(template_file, "aligned_full.csv", "Salmonella feature template (Genes + K-mers + SNPs)")
 
 # ── 5. Summary ─────────────────────────────────────────────────
 log("\n" + "=" * 60)
