@@ -28,7 +28,7 @@ RUN conda config --set channel_priority flexible && \
 # abricate  – gene detection (CARD + ResFinder for Salmonella; CARD-only for E. coli)
 # blast     – tBLASTn k-mer extraction
 # snippy    – SNP calling against reference genome
-RUN conda create -n requence python=3.9.19 -y && \
+RUN conda create -n requence python=3.10.14 -y && \
     conda install -n requence -c bioconda -c conda-forge \
         abricate=1.0.1 blast=2.16.0 snippy=4.6.0 -y
 
@@ -54,25 +54,29 @@ ENV WORK_DIR=/app/work \
     # Shared CARD protein database
     CARD_PROTEIN_FILE=/app/card_db/card_all_proteins.fasta
 
+# Reset SHELL for pip installs
+SHELL ["/bin/bash", "-c"]
+
 # ── Python dependencies ────────────────────────────────────────
-RUN conda run -n requence pip install --no-cache-dir --default-timeout=1000 \
-    numpy==1.26.4 \
+RUN conda install -n requence -c conda-forge numpy=1.26.4 pandas=2.2.2 scikit-learn=1.4.2 -y && \
+    /opt/conda/envs/requence/bin/pip install --no-cache-dir --default-timeout=1000 \
     fastapi==0.115.0 \
-    pandas==2.2.2 \
-    scikit-learn==1.4.2 \
     uvicorn==0.32.0 \
     uvloop==0.22.1 \
     httptools==0.7.1 \
     python-multipart==0.0.12
 
 COPY requirements.txt /app/
-RUN conda run -n requence pip install --no-cache-dir -r requirements.txt
+RUN /opt/conda/envs/requence/bin/pip install --no-cache-dir -r requirements.txt
 
 # ── Layer-cache-friendly cleanup ──────────────────────────────
 RUN conda clean --all -f -y && \
     rm -rf /opt/conda/pkgs/* /root/.cache/pip && \
     find /opt/conda -name "*.pyc" -delete && \
     find /opt/conda -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
+
+# Set SHELL back for final commands
+SHELL ["conda", "run", "-n", "requence", "/bin/bash", "-c"]
 
 # ── Copy project assets ────────────────────────────────────────
 # scripts/salmonella/  and  scripts/e_coli/
