@@ -83,7 +83,7 @@ PATHOGEN_CONFIG: Dict[str, Dict[str, Any]] = {
         "pipeline_steps": [
             {"cmd": "bash",    "script": "01_extract_genes.sh",  "timeout": 300},
             {"cmd": "python3", "script": "01b_process_genes.py", "timeout": 60},
-            {"cmd": "bash",    "script": "02_create_blast_db.sh","timeout": 60},
+            {"cmd": "bash",    "script": "02_create_blastdb.sh","timeout": 60},
             {"cmd": "python3", "script": "03_extract_kmers.py",  "timeout": 600},
             {"cmd": "bash",    "script": "04_extract_snps.sh",   "timeout": 1200},
             {"cmd": "python3", "script": "04b_process_snps.py",  "timeout": 60},
@@ -118,7 +118,7 @@ PATHOGEN_CONFIG: Dict[str, Dict[str, Any]] = {
         "pipeline_steps": [
             {"cmd": "bash",    "script": "01_extract_genes.sh",  "timeout": 300},
             {"cmd": "python3", "script": "01b_process_genes.py", "timeout": 60},
-            {"cmd": "bash",    "script": "02_create_blast_db.sh","timeout": 60},
+            {"cmd": "bash",    "script": "02_create_blastdb.sh","timeout": 60},
             {"cmd": "python3", "script": "03_extract_kmers.py",  "timeout": 600},
             {"cmd": "bash",    "script": "04_extract_snps.sh",   "timeout": 1200},
             {"cmd": "python3", "script": "04b_process_snps.py",  "timeout": 60},
