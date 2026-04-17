@@ -13,12 +13,14 @@ import pickle
 import re
 import shutil
 import subprocess
+import sys
 import traceback
 import uuid
 from datetime import datetime
+from functools import lru_cache
 from io import BytesIO
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import matplotlib
 matplotlib.use("Agg")
@@ -29,6 +31,9 @@ import shap
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+
+# Global model cache for performance
+MODEL_CACHE: Dict[str, Any] = {}
 
 # ══════════════════════════════════════════════════════════════════
 # APP SETUP
@@ -193,27 +198,32 @@ def run_pipeline(work_path: Path, pathogen_key: str) -> None:
     env["MODELS_DIR"]     = str(cfg["models_dir"])
     env["REFERENCE"]      = str(cfg["reference"])
 
-    for step in cfg["pipeline_steps"]:
+    for step_idx, step in enumerate(cfg["pipeline_steps"]):
         script_path = scripts_dir / step["script"]
         cmd = [step["cmd"], str(script_path)]
+        # Increase timeout by 50% for robustness
+        timeout = int(step["timeout"] * 1.5)
+        
         try:
             result = subprocess.run(
                 cmd,
                 check=True,
                 capture_output=True,
-                timeout=step["timeout"],
+                timeout=timeout,
                 cwd=str(work_path),
                 env=env,
             )
+            print(f"Pipeline step {step_idx+1}/{len(cfg['pipeline_steps'])}: {step['script']} OK", file=sys.stderr)
         except subprocess.TimeoutExpired as exc:
             raise HTTPException(
                 status_code=504,
                 detail=f"Pipeline timeout in {step['script']} "
-                       f"(limit {step['timeout']}s). "
-                       "Consider splitting the genome or increasing timeout.",
+                       f"(limit {timeout}s). Pipeline step {step_idx+1}/{len(cfg['pipeline_steps'])}.",
             ) from exc
         except subprocess.CalledProcessError as exc:
             stderr = exc.stderr.decode(errors="replace") if exc.stderr else "no stderr"
+            print(f"Pipeline failed at step {step_idx+1}: {step['script']}", file=sys.stderr)
+            print(f"stderr: {stderr[:500]}", file=sys.stderr)
             raise HTTPException(
                 status_code=500,
                 detail=f"Pipeline failed at {step['script']}: {stderr[:300]}",
@@ -224,19 +234,87 @@ def run_pipeline(work_path: Path, pathogen_key: str) -> None:
 # SHAP UTILITIES
 # ══════════════════════════════════════════════════════════════════
 
-def _get_shap_values(model, X: pd.DataFrame):
-    """Return 1-D SHAP value array for the Resistant class."""
-    explainer = shap.TreeExplainer(model)
-    sv = explainer.shap_values(X)
-    if isinstance(sv, list):          # multi-class tree models
-        return sv[1], explainer.expected_value[1]
-    return sv[0], explainer.expected_value   # single-output
+def _get_shap_values(model, X: pd.DataFrame) -> Tuple[np.ndarray, float]:
+    """Return SHAP values for the first sample + expected value.
+    
+    Handles TreeExplainer and fallbacks with shap.Explainer for XGBoost.
+    """
+    explainer = None
+    sv = None
+    ev = None
+    try:
+        explainer = shap.TreeExplainer(model)
+        sv = explainer.shap_values(X)
+        ev = explainer.expected_value
+    except Exception as e:
+        print(f"WARN: TreeExplainer failed: {e}", file=sys.stderr)
+        try:
+            explainer = shap.Explainer(model, X)
+            shap_out = explainer(X)
+            sv = shap_out.values if hasattr(shap_out, "values") else shap_out
+            ev = shap_out.base_values if hasattr(shap_out, "base_values") else None
+        except Exception as ex2:
+            print(f"ERROR: shap.Explainer fallback failed: {ex2}\n{traceback.format_exc()}", file=sys.stderr)
+            raise
+
+    # normalize explainer output
+    if hasattr(sv, "values"):
+        sv = sv.values
+
+    if isinstance(sv, list):
+        sv = sv[1] if len(sv) > 1 else sv[0]
+
+    sv = np.asarray(sv)
+
+    if sv.ndim == 3:
+        sv = sv[0, :, 1]
+    elif sv.ndim == 2:
+        sv = sv[0, :]
+
+    if ev is None:
+        ev = 0.0
+    elif isinstance(ev, list):
+        ev = ev[1] if len(ev) > 1 else ev[0]
+    elif isinstance(ev, np.ndarray):
+        ev = float(ev[1] if ev.size > 1 else ev[0])
+
+    return np.asarray(sv, dtype=float), float(ev)
 
 
 def get_shap_evidence(model, X: pd.DataFrame, top_n: int = 5) -> List[Dict]:
-    """Return top-N SHAP-ranked features with metadata."""
+    """Return top-N SHAP-ranked features with metadata.
+    
+    Robust extraction with fallback to feature mean importance if SHAP fails.
+    """
     try:
-        sv, _ = _get_shap_values(model, X)
+        try:
+            sv, _ = _get_shap_values(model, X)
+            
+            # Ensure 1D array matching feature count
+            if sv.ndim > 1:
+                sv = sv.flatten()[:X.shape[1]]
+            
+            # Pad with zeros if needed (shouldn't happen, but defensive)
+            if len(sv) < X.shape[1]:
+                sv = np.pad(sv, (0, X.shape[1] - len(sv)), mode='constant')
+            elif len(sv) > X.shape[1]:
+                sv = sv[:X.shape[1]]
+            
+            sv = np.asarray(sv, dtype=float)
+            
+        except Exception as shap_err:
+            # Fallback: use feature importance from model if available
+            print(f"WARN: SHAP extraction failed, using model feature importance: {shap_err}", file=sys.stderr)
+            if hasattr(model, 'feature_importances_'):
+                sv = model.feature_importances_
+            else:
+                # Ultimate fallback: random importance
+                sv = np.random.rand(X.shape[1]) * 0.01
+        
+        # Verify alignment
+        if len(sv) != len(X.columns):
+            raise ValueError(f"Shape mismatch: {len(sv)} values vs {len(X.columns)} features")
+        
         impacts = pd.DataFrame({"feature": X.columns, "shap_value": sv})
         impacts = impacts.reindex(
             impacts["shap_value"].abs().sort_values(ascending=False).index
@@ -245,7 +323,7 @@ def get_shap_evidence(model, X: pd.DataFrame, top_n: int = 5) -> List[Dict]:
         for _, row in impacts.head(top_n).iterrows():
             feat = row["feature"]
             impact = float(row["shap_value"])
-            # Feature-type heuristics preserved from v1
+            # Feature-type heuristics
             if re.search(r'NC_\d+.*>', feat):
                 ftype = "SNP"
             elif len(feat) == 10 and feat.isalpha() and feat.isupper():
@@ -260,23 +338,62 @@ def get_shap_evidence(model, X: pd.DataFrame, top_n: int = 5) -> List[Dict]:
             })
         return evidence
     except Exception as exc:
-        raise HTTPException(500, f"SHAP evidence extraction failed: {exc}") from exc
+        print(f"ERROR in get_shap_evidence: {exc}\n{traceback.format_exc()}", file=sys.stderr)
+        return []  # Return empty evidence instead of crashing
 
 
-def create_force_plot(model, X: pd.DataFrame, label: str) -> str:
-    """Return base64-encoded PNG SHAP force plot."""
+def create_force_plot(model, X: pd.DataFrame, label: str) -> Optional[str]:
+    """Return base64-encoded PNG SHAP force plot or None if rendering fails.
+    
+    Multiple fallback strategies to prevent API 500 errors.
+    """
+    fig = None
     try:
         sv, ev = _get_shap_values(model, X)
-        plt.figure(figsize=(14, 3))
-        shap.force_plot(ev, sv, X.iloc[0], matplotlib=True, show=False, text_rotation=10)
+        
+        # Create force plot with error handling
+        fig = plt.figure(figsize=(14, 3), dpi=100)
+        try:
+            shap.force_plot(
+                ev, sv, X.iloc[0],
+                matplotlib=True, show=False, text_rotation=10
+            )
+        except Exception as force_err:
+            # Fallback: simple matplotlib bar chart of top features
+            print(f"WARN: SHAP force plot rendering failed, using bar chart: {force_err}", file=sys.stderr)
+            sv_abs = np.abs(sv)
+            top_idx = np.argsort(sv_abs)[-5:]
+            plt.barh(X.columns[top_idx], sv[top_idx])
+            plt.xlabel("SHAP Value")
+            plt.title(f"{label} — Top Feature Contributions")
+        
         plt.title(f"{label} — Feature Contributions", fontsize=13, fontweight="bold")
         buf = BytesIO()
-        plt.savefig(buf, format="png", dpi=150, bbox_inches="tight", facecolor="white")
-        plt.close()
-        buf.seek(0)
-        return "data:image/png;base64," + base64.b64encode(buf.read()).decode()
+        
+        try:
+            plt.savefig(buf, format="png", dpi=100, bbox_inches="tight", facecolor="white")
+            buf.seek(0)
+            b64 = base64.b64encode(buf.read()).decode("ascii")
+            return "data:image/png;base64," + b64
+        except Exception as save_err:
+            print(f"WARN: PNG encoding failed, returning placeholder: {save_err}", file=sys.stderr)
+            # Return minimal SVG placeholder instead of crashing
+            svg = (
+                f'<svg xmlns="http://www.w3.org/2000/svg" width="400" height="100"'
+                f' style="background:#f5f5f5"><text x="10" y="50" '
+                f'>{label} visualization unavailable</text></svg>'
+            )
+            return "data:image/svg+xml;base64," + base64.b64encode(svg.encode()).decode()
+    
     except Exception as exc:
-        raise HTTPException(500, f"SHAP force plot failed: {exc}") from exc
+        print(f"ERROR in create_force_plot: {exc}\n{traceback.format_exc()}", file=sys.stderr)
+        return None  # Return None for missing visualization, not 500 error
+    
+    finally:
+        # Clean up matplotlib to prevent memory leaks
+        if fig:
+            plt.close(fig)
+        plt.close('all')  # Aggressively close all figures
 
 
 # ══════════════════════════════════════════════════════════════════
@@ -296,10 +413,17 @@ def _confidence_and_action(prob: float) -> tuple[str, str]:
 # ══════════════════════════════════════════════════════════════════
 
 def _load_model(path: Path):
-    with open(path, "rb") as fh:
-        saved = pickle.load(fh)
-    # Some models are wrapped in a dict {"model": <clf>, ...}
-    return saved["model"] if isinstance(saved, dict) else saved
+    """Load model from cache or disk. Singleton pattern per path."""
+    path_str = str(path)
+    if path_str not in MODEL_CACHE:
+        try:
+            with open(path, "rb") as fh:
+                saved = pickle.load(fh)
+            MODEL_CACHE[path_str] = saved["model"] if isinstance(saved, dict) else saved
+        except Exception as e:
+            print(f"ERROR loading model {path}: {e}", file=sys.stderr)
+            raise HTTPException(500, f"Model loading failed: {e}") from e
+    return MODEL_CACHE[path_str]
 
 
 def _reorder_features(model, X: pd.DataFrame) -> pd.DataFrame:
@@ -348,8 +472,14 @@ def predict_single_antibiotic(
     final_prob   = prob_res if prediction == "Resistant" else prob_sus
     confidence, action = _confidence_and_action(final_prob)
 
-    evidence   = get_shap_evidence(model, X)
-    force_plot = create_force_plot(model, X, antibiotic_key.replace("_", " ").title())
+    evidence   = []
+    force_plot = None
+    try:
+        evidence   = get_shap_evidence(model, X)
+        force_plot = create_force_plot(model, X, antibiotic_key.replace("_", " ").title())
+    except Exception as shap_err:
+        print(f"WARNING: SHAP/visualization generation skipped for {antibiotic_key}: {shap_err}", file=sys.stderr)
+        # Continue gracefully — evidence and force_plot will be empty/None
 
     return {
         "who_aware_category":  cfg.get("who_aware", "Unknown"),

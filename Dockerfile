@@ -59,7 +59,7 @@ SHELL ["/bin/bash", "-c"]
 
 # ── Python dependencies ────────────────────────────────────────
 RUN conda install -n requence -c conda-forge numpy=1.26.4 pandas=2.2.2 scikit-learn=1.4.2 -y && \
-    /opt/conda/envs/requence/bin/pip install --no-cache-dir --default-timeout=1000 \
+    /opt/conda/envs/requence/bin/pip install --no-cache-dir --default-timeout=3600 \
     fastapi==0.115.0 \
     uvicorn==0.32.0 \
     uvloop==0.22.1 \
@@ -67,7 +67,7 @@ RUN conda install -n requence -c conda-forge numpy=1.26.4 pandas=2.2.2 scikit-le
     python-multipart==0.0.12
 
 COPY requirements.txt /app/
-RUN /opt/conda/envs/requence/bin/pip install --no-cache-dir -r requirements.txt
+RUN /opt/conda/envs/requence/bin/pip install --no-cache-dir --default-timeout=3600 -r requirements.txt
 
 # ── Layer-cache-friendly cleanup ──────────────────────────────
 RUN conda clean --all -f -y && \
