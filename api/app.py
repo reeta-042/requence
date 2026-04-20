@@ -352,16 +352,20 @@ def create_force_plot(model, X: pd.DataFrame, label: str) -> Optional[str]:
     try:
         sv, ev = _get_shap_values(model, X)
         
-        # Create force plot with error handling
-        fig = plt.figure(figsize=(14, 3), dpi=100)
         try:
-            shap.force_plot(
-                ev, sv, X.iloc[0],
-                matplotlib=True, show=False, text_rotation=10
+            # Create waterfall plot (force_plot dropped matplotlib support in modern SHAP)
+            exp = shap.Explanation(
+                values=sv,
+                base_values=ev,
+                data=X.iloc[0].values,
+                feature_names=X.columns.tolist()
             )
+            fig = plt.figure(figsize=(10, 5), dpi=100)
+            shap.plots.waterfall(exp, show=False)
         except Exception as force_err:
             # Fallback: simple matplotlib bar chart of top features
-            print(f"WARN: SHAP force plot rendering failed, using bar chart: {force_err}", file=sys.stderr)
+            print(f"WARN: SHAP waterfall plot rendering failed, using bar chart: {force_err}", file=sys.stderr)
+            fig = plt.figure(figsize=(10, 5), dpi=100)
             sv_abs = np.abs(sv)
             top_idx = np.argsort(sv_abs)[-5:]
             plt.barh(X.columns[top_idx], sv[top_idx])

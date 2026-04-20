@@ -18,11 +18,7 @@ ENV PATH="/opt/conda/bin:$PATH"
 RUN conda init bash
 
 # Accept conda TOS
-RUN conda config --set channel_priority flexible && \
-    echo "yes" | conda tos accept --override-channels \
-        --channel https://repo.anaconda.com/pkgs/main && \
-    echo "yes" | conda tos accept --override-channels \
-        --channel https://repo.anaconda.com/pkgs/r
+RUN conda config --set channel_priority flexible
 
 # ── Bioinformatics conda environment ──────────────────────────
 # abricate  – gene detection (CARD + ResFinder for Salmonella; CARD-only for E. coli)
@@ -64,7 +60,8 @@ RUN conda install -n requence -c conda-forge numpy=1.26.4 pandas=2.2.2 scikit-le
     uvicorn==0.32.0 \
     uvloop==0.22.1 \
     httptools==0.7.1 \
-    python-multipart==0.0.12
+    python-multipart==0.0.12 \
+    requests==2.32.3
 
 COPY requirements.txt /app/
 RUN /opt/conda/envs/requence/bin/pip install --no-cache-dir --default-timeout=3600 -r requirements.txt
