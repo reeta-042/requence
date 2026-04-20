@@ -2,10 +2,10 @@
 # =============================================================
 # E. COLI — SCRIPT 04b: PROCESS SNP EXTRACTION OUTPUT
 # Input:  snippy_production_out/snps.tab
-#         $TEMPLATES_DIR/features_*.txt  (all 8 per-antibiotic templates)
+#         $TEMPLATES_DIR/features_*.txt  (JUST ONE E. COLI antibiotic template)
 # Output: snp_production.csv
 #         logs/04b_process_snps.log
-# NOTE:   We take the UNION of SNP feature names across all 8
+# NOTE:   We take the UNION of SNP feature names across all 
 #         templates so one pass covers every model's SNP needs.
 #         Vectorised matching used for speed (vs row-by-row loop).
 # =============================================================

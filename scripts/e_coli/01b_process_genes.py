@@ -2,11 +2,10 @@
 # =============================================================
 # E. COLI — SCRIPT 01b: PROCESS GENE EXTRACTION OUTPUT
 # Input:  card_production.tsv
+#         resfinder_production.tsv
 #         gene_summary_production.tsv
 # Output: gene_presence_production.csv
 #         logs/01b_process_genes.log
-# NOTE:   E. coli processes ONE database (CARD only).
-#         No ResFinder merge needed.
 # =============================================================
 
 import os
@@ -15,11 +14,12 @@ import pandas as pd
 from datetime import datetime
 from pathlib import Path
 
-# ── Paths ──────────────────────────────────────────────────────
+# ── Paths (injected by API, fallback to cwd for standalone use) ─
 WORK_DIR = Path(os.environ.get("WORK_DIR", "."))
 LOG_FILE = WORK_DIR / "logs" / "01b_process_genes.log"
 os.chdir(WORK_DIR)
 
+# ── Logger ─────────────────────────────────────────────────────
 def log(msg: str) -> None:
     line = f"[{datetime.now():%H:%M:%S}] {msg}"
     print(line)
@@ -33,34 +33,39 @@ with open(LOG_FILE, "w") as fh:
     fh.write(f"Started: {datetime.now()}\n")
     fh.write("=" * 60 + "\n")
 
-# ── 1. Resolve genome ID ────────────────────────────────────────
+# ── 1. Resolve genome ID from the query file directly ──────────
+# Using the filename avoids the ABRicate summary path-as-ID bug.
 if not (WORK_DIR / "query_genome.fna").exists():
     log("✗ ERROR: query_genome.fna not found")
     sys.exit(1)
 GENOME_ID = "query_genome"
 log(f"Genome ID: {GENOME_ID}")
 
-# ── 2. Load ABRicate output ─────────────────────────────────────
-log("Loading ABRicate CARD output...")
+# ── 2. Load ABRicate outputs ────────────────────────────────────
+log("Loading ABRicate outputs...")
 try:
-    card = pd.read_csv(WORK_DIR / "card_production.tsv", sep="\t")
-    log(f"  CARD hits: {len(card)}")
+    card = pd.read_csv("card_production.tsv", sep="\t")
+    res  = pd.read_csv("resfinder_production.tsv", sep="\t")
+    log(f"  CARD hits    : {len(card)}")
+    log(f"  ResFinder hits: {len(res)}")
 except Exception as exc:
-    log(f"✗ ERROR loading card_production.tsv: {exc}")
+    log(f"✗ ERROR loading TSV files: {exc}")
     sys.exit(1)
 
 try:
-    summary = pd.read_csv(WORK_DIR / "gene_summary_production.tsv", sep="\t")
+    summary = pd.read_csv("gene_summary_production.tsv", sep="\t")
     log(f"  Summary shape: {summary.shape}")
 except Exception as exc:
-    log(f"✗ ERROR loading gene_summary_production.tsv: {exc}")
+    log(f"✗ ERROR loading summary matrix: {exc}")
     sys.exit(1)
 
 # ── 3. Clean and binarise ───────────────────────────────────────
 log("Processing gene matrix...")
+
 summary.rename(columns={"#FILE": "Genome_ID"}, inplace=True)
 summary["Genome_ID"] = GENOME_ID
 
+# Drop bookkeeping columns produced by ABRicate
 drop_cols = [c for c in summary.columns if "NUM_FOUND" in c.upper()]
 if drop_cols:
     summary.drop(columns=drop_cols, inplace=True)
@@ -73,13 +78,15 @@ feature_cols = [c for c in summary.columns if c != "Genome_ID"]
 for col in feature_cols:
     summary[col] = summary[col].apply(_make_binary)
 
-# ── 4. Collapse if multi-row (should only be 1 for CARD-only) ──
+# ── 4. Collapse multi-row summary into one genome row ──────────
+# ABRicate summary has one row per input TSV file (2 here).
+# A gene is PRESENT if detected in EITHER database.
 if len(summary) > 1:
     feat_vals = summary[feature_cols].max(axis=0)
     final_row = pd.DataFrame([feat_vals])
     final_row.insert(0, "Genome_ID", GENOME_ID)
     summary = final_row
-    log(f"  Collapsed {len(summary)+1} rows → 1 genome row")
+    log(f"  Collapsed {len(summary)+1} database rows → 1 genome row using union rule")
 
 # ── 5. Save ─────────────────────────────────────────────────────
 out_path = WORK_DIR / "gene_presence_production.csv"

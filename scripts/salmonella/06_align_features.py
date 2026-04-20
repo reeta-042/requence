@@ -49,7 +49,7 @@ required = [
 ]
 for fname in required:
     if not (WORK_DIR / fname).exists():
-        log(f"✗ ERROR: {fname} not found")
+        log(f" ERROR: {fname} not found")
         log("  Ensure scripts 01b, 03, and 04b all completed successfully")
         sys.exit(1)
 
@@ -70,12 +70,12 @@ merged = genes_df.copy()
 if kmers_df.shape[1] > 1:
     merged = merged.merge(kmers_df, on="Genome_ID", how="left")
 else:
-    log("  ⚠ No k-mer features — all k-mer columns will be 0")
+    log("   No k-mer features — all k-mer columns will be 0")
 
 if snps_df.shape[1] > 1:
     merged = merged.merge(snps_df, on="Genome_ID", how="left")
 else:
-    log("  ⚠ No SNP features — all SNP columns will be 0")
+    log("  No SNP features — all SNP columns will be 0")
 
 merged.fillna(0, inplace=True)
 for col in [c for c in merged.columns if c != "Genome_ID"]:
@@ -95,7 +95,7 @@ def align_to_template(template_path: Path, output_name: str, label: str) -> floa
     log(f"  Template   : {template_path.name}")
 
     if not template_path.exists():
-        log(f"  ✗ ERROR: Template not found: {template_path}")
+        log(f"   ERROR: Template not found: {template_path}")
         sys.exit(1)
 
     with open(template_path) as fh:
@@ -122,12 +122,12 @@ def align_to_template(template_path: Path, output_name: str, label: str) -> floa
     aligned.to_csv(out_path, index=False)
 
     if missing_pct > 95:
-        log(f"  ⚠ WARNING: {missing_pct:.1f}% missing exceeds 95% threshold!")
-        log("  ⚠ Check upstream extraction scripts for failures")
+        log(f"   WARNING: {missing_pct:.1f}% missing exceeds 95% threshold!")
+        log("   Check upstream extraction scripts for failures")
     else:
-        log(f"  ✓ Alignment within expected range")
+        log(f"   Alignment within expected range")
 
-    log(f"  ✓ Saved: {output_name}  (shape {aligned.shape})")
+    log(f"   Saved: {output_name}  (shape {aligned.shape})")
     return missing_pct
 
 
@@ -151,13 +151,13 @@ log(f"  Full dataset    : {pct_full:.1f}% missing → aligned_full.csv")
 
 if pct_full > 95:
     log("")
-    log("  ⚠ ALIGNMENT EXCEEDED 95% MISSING THRESHOLD")
-    log("  ⚠ Check scripts 01b, 03, 04b before running prediction")
+    log("   ALIGNMENT EXCEEDED 95% MISSING THRESHOLD")
+    log("   Check scripts 01b, 03, 04b before running prediction")
     sys.exit(1)
 else:
     log("")
-    log("  ✓ Alignment within expected range")
-    log("  ✓ Ready for prediction")
+    log("   Alignment within expected range")
+    log("   Ready for prediction")
 
 log("")
 log("  Next step: python3 07_predict.py  (handled by API)")

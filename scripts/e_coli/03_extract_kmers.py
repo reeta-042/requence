@@ -3,12 +3,12 @@
 # E. COLI — SCRIPT 03: K-MER EXTRACTION (tBLASTn)
 # Input:  blast_db/query_genome
 #         $CARD_PROTEIN_FILE
-#         $TEMPLATES_DIR/features_*.txt  (8 per-antibiotic templates)
+#         $TEMPLATES_DIR/features_*.txt  (ONE E. COLI antibiotic template)
 # Output: kmer_production.csv
 #         logs/03_extract_kmers.log
-# NOTE:   E. coli has 8 separate per-antibiotic feature templates.
-#         We take the UNION of k-mers across all templates so a
-#         single tBLASTn pass covers every model's k-mer needs.
+# NOTE:   E. coli uses ONE shared feature set.  We scan all
+#         template files under TEMPLATES_DIR to collect the
+#         union of training k-mers, then filter to that set.
 # =============================================================
 
 import os
@@ -59,25 +59,24 @@ for required in [CARD_FILE, Path(f"{BLAST_DB}.nhr")]:
         sys.exit(1)
 
 # ── 1. Collect training k-mers from ALL 8 per-antibiotic templates
-log("Loading training k-mer feature list from all antibiotic templates...")
+log("Loading training k-mer feature list from templates...")
 training_kmers: set = set()
 
-template_files = sorted(TEMPLATES_DIR.glob("features_*.txt"))
+template_files = list(TEMPLATES_DIR.glob("features_*.txt"))
 if not template_files:
     log(f"⚠ WARNING: No feature templates found in {TEMPLATES_DIR}")
 
 for tf in template_files:
-    before = len(training_kmers)
     with open(tf) as fh:
         for line in fh:
             feat = line.strip()
-            # K-mers: exactly 10 uppercase alphabetic characters, no digits
+            # K-mers: exactly 10 uppercase alphabetic characters
             if len(feat) == 10 and feat.isalpha() and feat.isupper():
                 training_kmers.add(feat)
-    added = len(training_kmers) - before
-    log(f"  ✓ {tf.name}  (+{added} k-mers)")
+    log(f"  ✓ Loaded: {tf.name}")
 
-log(f"\n  Total unique k-mers across all templates: {len(training_kmers):,}")
+log(f"\n  Total unique training k-mers: {len(training_kmers):,}")
+
 
 if len(training_kmers) == 0:
     log("✗ ERROR: No k-mers found in templates.")

@@ -130,16 +130,16 @@ PATHOGEN_CONFIG: Dict[str, Dict[str, Any]] = {
             {"cmd": "python3", "script": "06_align_features.py", "timeout": 60},
         ],
         # Per-antibiotic aligned CSVs
-        "prediction_mode": "per_antibiotic_aligned",
+        "prediction_mode": "single_aligned",
         "antibiotics": {
-            "amoxicillin_clavulanic_acid": {"model": "amoxicillin_ecoli_model.pkl",   "aligned": "aligned_amoxicillin.csv", "who_aware": "Access"},
-            "cefuroxime":                  {"model": "cefuroxime_ecoli_model.pkl",    "aligned": "aligned_coxime.csv",      "who_aware": "Watch"},
-            "doxycycline":                 {"model": "doxycycline_ecoli_model.pkl",   "aligned": "aligned_doxy.csv",        "who_aware": "Access"},
-            "levofloxacin":                {"model": "levofloxacin_ecoli_model.pkl",  "aligned": "aligned_levo.csv",        "who_aware": "Watch"},
-            "nalidixic_acid":              {"model": "nalidixic_acid_ecoli_model.pkl","aligned": "aligned_nali.csv",        "who_aware": "Watch"},
-            "norfloxacin":                 {"model": "norfloxacin_ecoli_model.pkl",   "aligned": "aligned_norflo.csv",      "who_aware": "Watch"},
-            "streptomycin":                {"model": "streptomycin_ecoli_model.pkl",  "aligned": "aligned_strep.csv",       "who_aware": "Access"},
-            "tetracycline":                {"model": "tetracycline_ecoli_model.pkl",  "aligned": "aligned_tetra.csv",       "who_aware": "Access"},
+            "amoxicillin_clavulanic_acid": {"model": "amoxicillin_ecoli_model.pkl",   "aligned": "aligned_full.csv", "who_aware": "Access"},
+            "cefuroxime":                  {"model": "cefuroxime_ecoli_model.pkl",    "aligned": "aligned_full.csv",      "who_aware": "Watch"},
+            "doxycycline":                 {"model": "doxycycline_ecoli_model.pkl",   "aligned": "aligned_full.csv",        "who_aware": "Access"},
+            "levofloxacin":                {"model": "levofloxacin_ecoli_model.pkl",  "aligned": "aligned_full.csv",        "who_aware": "Watch"},
+            "nalidixic_acid":              {"model": "nalidixic_acid_ecoli_model.pkl","aligned": "aligned_full.csv",        "who_aware": "Watch"},
+            "norfloxacin":                 {"model": "norfloxacin_ecoli_model.pkl",   "aligned": "aligned_full.csv",      "who_aware": "Watch"},
+            "streptomycin":                {"model": "streptomycin_ecoli_model.pkl",  "aligned": "aligned_full.csv",       "who_aware": "Access"},
+            "tetracycline":                {"model": "tetracycline_ecoli_model.pkl",  "aligned": "aligned_full.csv",       "who_aware": "Access"},
         },
         "metadata": {
             "reference_genome": "Escherichia_coli_K12_MG1655",
@@ -197,6 +197,7 @@ def run_pipeline(work_path: Path, pathogen_key: str) -> None:
     env["TEMPLATES_DIR"]  = str(cfg["templates_dir"])
     env["MODELS_DIR"]     = str(cfg["models_dir"])
     env["REFERENCE"]      = str(cfg["reference"])
+    env["CARD_PROTEIN_FILE"] = os.getenv("CARD_PROTEIN_FILE", "/app/card_db/card_all_proteins.fasta")
 
     for step_idx, step in enumerate(cfg["pipeline_steps"]):
         script_path = scripts_dir / step["script"]
