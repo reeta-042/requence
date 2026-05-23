@@ -4,8 +4,8 @@
 ## Overview
 ML-powered API for predicting antibiotic resistance in **Salmonella enterica** and **Escherichia coli** genomes. This version introduces automated pathogen resolution based on Kraken2 taxonomy and WHO AWaRe classification.
 
-**Version:** 2.0.0  
-**Docker Image:** `ejiaborrita/requence_amr_project:v2.0.0`
+**Version:** 2.1.0  
+**Docker Image:** `ejiaborrita/requence:v2.1.0`
 
 ---
 
@@ -13,13 +13,13 @@ ML-powered API for predicting antibiotic resistance in **Salmonella enterica** a
 
 ### Pull Image
 ```bash
-docker pull ejiaborrita/requence_amr_project:v2.0.0
+docker pull ejiaborrita/requence:v2.1.0
 ```
 
 ### Run Container
 Ensure you mount your local models and work directories if they are not baked into the image.
 ```bash
-docker run -d -p 8000:8000 --name amr-api-v2 ejiaborrita/requence_amr_project:v2.0.0
+docker run -d -p 8000:8000 --name amr-api-v2 ejiaborrita/requence:v2.1.0
 ```
 
 ---
